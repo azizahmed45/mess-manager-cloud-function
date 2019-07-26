@@ -16,7 +16,7 @@ notification.depositRequest = functions.firestore
 			db.runTransaction((tnx) => {
 				return tnx.get(db.doc(`Mess/${context.params.uniqueId}`)).then((admin) => {
 					let recipients = [ admin.get('adminUid') ];
-					let depositAmount = snap.get('amount');
+					let depositAmount = snap.get('amount').toString();
 					let depositor = snap.get('userUid');
 
 					let notification = DepositRequestNotification(
@@ -27,28 +27,7 @@ notification.depositRequest = functions.firestore
 					);
 
 					getNotificationRef(messId).add(notification);
-
-					// getNotificationRef(messId).add({
-					// 	type: TYPE.DEPOSIT_REQUEST,
-					// 	recipients: recipients
-					// });
-					// return documentSnapshot.get('adminUid');
 				});
-				// //get admin devices reference
-				// .then((adminUid) => {
-
-				// 	// return db.collection(`Users/${adminUid}/Device`).listDocuments();
-				// })
-				// //get admin devices doc
-				// .then((documnetReferences) => {
-				// 	return tnx.getAll(...documnetReferences);
-				// })
-				// //get admin devices
-				// .then((devices) => {
-				// 	let recipients = devices.map((device) => device.get('token'));
-				// 	// sendNotifications(documentSnapshot.get('token'), snap.data().amount);
-				// 	getNotificationRef(messId).add(Notification(TYPE.DEPOSIT_REQUEST, recipients));
-				// })
 			})
 		);
 	});
@@ -62,7 +41,7 @@ notification.depositRequestAccept = functions.firestore
 			return db.runTransaction((tnx) => {
 				return tnx.get(db.collection('Users').where('messId', '==', context.params.uniqueId)).then((users) => {
 					let recipients = users.docs.map((user) => user.get('uid'));
-					let depositAmount = change.after.get('amount');
+					let depositAmount = change.after.get('amount').toString();
 					let depositor = change.after.get('userUid');
 
 					let notification = DepositRequestAcceptedNotification(
@@ -73,10 +52,6 @@ notification.depositRequestAccept = functions.firestore
 					);
 
 					getNotificationRef(messId).add(notification);
-					// getNotificationRef(messId).add({
-					// 	type: TYPE.DEPOSIT_REQUEST_ACCEPTED,
-					// 	recipients: recipients
-					// });
 				});
 			});
 		}
@@ -85,14 +60,14 @@ notification.depositRequestAccept = functions.firestore
 notification.sendNotification = functions.firestore
 	.document('Mess/{uniqueId}/Notifications/{notificationId}')
 	.onCreate((snap, context) => {
-		console.log(snap);
+		console.log('snap data: ', snap.data());
 		let recipients = snap.get('recipients');
 		let deviceCollectionList = recipients.map((uid) => db.collection(`Users/${uid}/Device`));
 
 		deviceCollectionList.forEach((deviceColection) => {
 			deviceColection.get().then((devices) => {
 				devices.docs.forEach((device) => {
-					sendNotifications(device.get('token', snap.get('depositAmount')));
+					sendNotifications(device.get('token'), snap.data());
 				});
 			});
 		});
@@ -109,13 +84,12 @@ function getNotificationRef(messId) {
 	return db.collection(`Mess/${messId}/Notifications`);
 }
 
-function sendNotifications(token, amount) {
+function sendNotifications(token, data) {
+	//delete array
+	delete data.recipients;
+
 	let message = {
-		data: {
-			id: '130',
-			title: 'Deposit ' + amount,
-			body: 'body'
-		},
+		data: data,
 		token: token
 	};
 
